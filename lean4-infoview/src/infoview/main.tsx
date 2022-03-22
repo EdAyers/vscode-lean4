@@ -17,6 +17,7 @@ import { WithRpcSessions } from './rpcSessions';
 import { EditorConnection, EditorEvents } from './editorConnection';
 import { Event } from './event';
 import { ServerVersion } from './serverVersion';
+import { UserWidget } from './userWidget';
 
 function Main(props: {}) {
     const ec = React.useContext(EditorContext);
@@ -65,6 +66,7 @@ function Main(props: {}) {
                 <div className="mv2">
                     <AllMessages uri={curUri} />
                 </div>
+                <UserWidget />
             </div>)
     }
 

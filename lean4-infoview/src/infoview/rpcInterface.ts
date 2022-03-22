@@ -151,3 +151,8 @@ export async function InteractiveDiagnostics_msgToInteractive(rs: RpcSessions, p
     if (ret) TaggedMsg_registerRefs(rs, pos, ret)
     return ret
 }
+
+export async function Widget_getCodeAtPoint(rs: RpcSessions, pos: DocumentPosition): Promise<string | undefined> {
+    const ret = await rs.call<string>(pos, 'Widget_getCodeAtPoint', DocumentPosition.toTdpp(pos))
+    return ret
+}

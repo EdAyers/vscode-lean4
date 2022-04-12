@@ -5,6 +5,7 @@ import type { DocumentUri, Position, Range, TextDocumentPositionParams } from 'v
 import { Event } from './event';
 import { EditorContext } from './contexts';
 
+/** A document URI and a position in that document. */
 export interface DocumentPosition extends Position {
   uri: DocumentUri;
 }
@@ -75,10 +76,11 @@ export function useEvent<T>(ev: Event<T>, f: (_: T) => void, dependencies?: Reac
 }
 
 export function useEventResult<T>(ev: Event<T>): T | undefined;
-export function useEventResult<T, S>(ev: Event<S>, map: (_: S | undefined) => T | undefined): T | undefined;
+export function useEventResult<T, S>(ev: Event<S>, map: (newVal: S | undefined, prev : T | undefined) => T): T;
 export function useEventResult(ev: Event<unknown>, map?: any): any {
-  const [t, setT] = React.useState(() => map ? map(ev.current) : ev.current);
-  useEvent(ev, newT => setT(map ? map(newT) : newT));
+  map = map ?? ((x : any) => x)
+  const [t, setT] = React.useState(() => map(ev.current, undefined));
+  useEvent(ev, newT => setT(map(newT, t)));
   return t;
 }
 

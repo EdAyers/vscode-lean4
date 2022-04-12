@@ -5,11 +5,14 @@
  * @module
  */
 
-import { RpcPtr, LeanDiagnostic } from '@lean4/infoview-api'
+import { RpcPtr, LeanDiagnostic, isRpcError, RpcErrorCode } from '@lean4/infoview-api'
 
 import { DocumentPosition } from './util'
 import { RpcSessions } from './rpcSessions'
+import * as React from 'react'
+import { RpcContext } from './contexts'
 
+/** A string where certain (possibly nested) substrings have been decorated with objects of type T. */
 export type TaggedText<T> =
     { text: string } |
     { append: TaggedText<T>[] } |
@@ -43,10 +46,11 @@ export interface CodeToken {
 export type CodeWithInfos = TaggedText<CodeToken>
 export type ExprWithCtx = RpcPtr<'ExprWithCtx'>
 
+/** Information that should appear in a popup when clicking on a subexpression. */
 export interface InfoPopup {
-  type?: CodeWithInfos
-  exprExplicit?: CodeWithInfos
-  doc?: string
+    type?: CodeWithInfos
+    exprExplicit?: CodeWithInfos
+    doc?: string
 }
 
 function CodeWithInfos_registerRefs(rs: RpcSessions, pos: DocumentPosition, ci: CodeWithInfos): void {
@@ -132,7 +136,7 @@ export interface LineRange {
 }
 
 export async function getInteractiveDiagnostics(rs: RpcSessions, pos: DocumentPosition, lineRange?: LineRange): Promise<InteractiveDiagnostic[] | undefined> {
-    const ret = await rs.call<InteractiveDiagnostic[]>(pos, 'Lean.Widget.getInteractiveDiagnostics', {lineRange})
+    const ret = await rs.call<InteractiveDiagnostic[]>(pos, 'Lean.Widget.getInteractiveDiagnostics', { lineRange })
     if (ret) {
         for (const d of ret) {
             TaggedMsg_registerRefs(rs, pos, d.message)
@@ -152,7 +156,32 @@ export async function InteractiveDiagnostics_msgToInteractive(rs: RpcSessions, p
     return ret
 }
 
-export async function Widget_getCodeAtPoint(rs: RpcSessions, pos: DocumentPosition): Promise<string | undefined> {
-    const ret = await rs.call<string>(pos, 'Widget_getCodeAtPoint', DocumentPosition.toTdpp(pos))
-    return ret
+export interface GetWidgetResponse {
+    id: string
+    props: any
+}
+
+export function Widget_getWidget(rs: RpcSessions, pos: DocumentPosition): Promise<GetWidgetResponse | undefined> {
+    return rs.call(pos, "Lean.Widget.getWidget", DocumentPosition.toTdpp(pos))
+}
+
+/** Gets the static JS code for a given widget.
+ *
+ * We make the assumption that either the code doesn't exist, or it exists and does not change for the lifetime of the widget.
+ * [todo] cache on widgetId, but then there needs to be some way of signalling that the widgetId's code has changed if the user edits it?
+ */
+export async function Widget_getStaticJS(rs: RpcSessions, pos: DocumentPosition, widgetId: string): Promise<string | undefined> {
+    try {
+        return await rs.call(pos, "Lean.Widget.getStaticJS", { "pos": DocumentPosition.toTdpp(pos), widgetId })
+    } catch (e) {
+        if (isRpcError(e)){
+            if (e.code === RpcErrorCode.MethodNotFound || e.code === RpcErrorCode.InvalidParams) {
+                return undefined
+            } else {
+                throw Error(`RPC Error: ${RpcErrorCode[e.code]}: ${e.message}`)
+            }
+        } else {
+            throw Error(`Unknown rpc error ${JSON.stringify(e)}`)
+        }
+    }
 }

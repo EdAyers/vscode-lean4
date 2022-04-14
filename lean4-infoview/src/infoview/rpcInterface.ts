@@ -158,6 +158,7 @@ export async function InteractiveDiagnostics_msgToInteractive(rs: RpcSessions, p
 
 export interface GetWidgetResponse {
     id: string
+    hash: number
     props: any
 }
 
@@ -165,12 +166,17 @@ export function Widget_getWidget(rs: RpcSessions, pos: DocumentPosition): Promis
     return rs.call(pos, "Lean.Widget.getWidget", DocumentPosition.toTdpp(pos))
 }
 
+export interface StaticJS {
+    javascript : string
+    hash : number
+}
+
 /** Gets the static JS code for a given widget.
  *
  * We make the assumption that either the code doesn't exist, or it exists and does not change for the lifetime of the widget.
  * [todo] cache on widgetId, but then there needs to be some way of signalling that the widgetId's code has changed if the user edits it?
  */
-export async function Widget_getStaticJS(rs: RpcSessions, pos: DocumentPosition, widgetId: string): Promise<string | undefined> {
+export async function Widget_getStaticJS(rs: RpcSessions, pos: DocumentPosition, widgetId: string): Promise<StaticJS | undefined> {
     try {
         return await rs.call(pos, "Lean.Widget.getStaticJS", { "pos": DocumentPosition.toTdpp(pos), widgetId })
     } catch (e) {

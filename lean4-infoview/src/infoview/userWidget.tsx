@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { Location } from 'vscode-languageserver-protocol';
 
 import { EditorContext, RpcContext } from './contexts';
-import { Widget_getStaticJS, Widget_getWidget } from './rpcInterface';
+import { GetWidgetResponse, Widget_getStaticJS, Widget_getWidget } from './rpcInterface';
 import { DocumentPosition, useEvent, useEventResult } from './util';
 import { ErrorBoundary } from './errors';
 import { RpcSessions } from './rpcSessions';
@@ -24,10 +24,9 @@ function memoize<T extends (...args : any[]) => any>(fn: T, keyFn: any = (x: any
     return r
 }
 
-// [todo] cache should be invalidated when document changes.
-const dynamicallyLoadComponent = memoize(function (widgetId : string, code: string, ) {
+const dynamicallyLoadComponent = memoize(function (hash : number, code: string, ) {
     return React.lazy(async () => {
-        let file = new File([code], `widget_${widgetId}.js`, { type: "text/javascript" })
+        let file = new File([code], `widget_${hash}.js`, { type: "text/javascript" })
         let url = URL.createObjectURL(file)
         return await import(url)
     })
@@ -37,12 +36,13 @@ type Status = "pending" | "fulfilled" | "rejected"
 
 // [todo] this badly handles case where effect is being spammed because lots of in-flight promises will be updating the state without locks.
 // There is some code in the infoview that deals with this problem somewhere.
-export function useAsync<T>(fn : () => Promise<T>, deps : React.DependencyList = []) : [Status, T | undefined, Error] {
+export function useAsync<T>(fn : () => Promise<T>, deps : React.DependencyList = []) : [Status, T | undefined, Error | undefined] {
     const [status, setStatus] = React.useState<Status>("pending")
     const [result, setResult] = React.useState<T | undefined>(undefined)
-    const [error, setError] = React.useState<unknown | undefined>(undefined)
+    const [error, setError] = React.useState<Error | undefined>(undefined)
     React.useEffect(() => {
         setStatus("pending")
+        setError(undefined)
         fn().then(result => {
             setStatus("fulfilled")
             setResult(result)
@@ -63,19 +63,25 @@ export function useAsync<T>(fn : () => Promise<T>, deps : React.DependencyList =
 interface GetWidgetResult {
     component? : any
     id : string
+    hash : number
     props : any
 }
+
+const getCode = memoize(
+    (rc : RpcSessions, pos : DocumentPosition, widget : GetWidgetResponse) => Widget_getStaticJS(rc, pos, widget.id),
+    (rc : RpcSessions, pos : DocumentPosition, widget : GetWidgetResponse) => widget.hash,
+)
 
 async function getWidget(rc : RpcSessions, pos : DocumentPosition) : Promise<undefined | GetWidgetResult> {
     const widget = await Widget_getWidget(rc, pos)
     if (!widget) {
         return undefined
     }
-    const code = await Widget_getStaticJS(rc, pos, widget.id)
+    const code = await getCode(rc, pos, widget)
     if (!code) {
         return widget
     }
-    const component = dynamicallyLoadComponent(widget.id, code)
+    const component = dynamicallyLoadComponent(widget.hash, code.javascript)
     return {...widget, component}
 }
 
@@ -101,11 +107,12 @@ export function UserWidget(props: any) {
     const component = result?.component
 
 
-    return <React.Suspense fallback={`Loading widget: ${widgetId} ${status}.`}>
-        <ErrorBoundary>
-            <div>{status}</div>
-            {component && <div>{React.createElement(component, ps)}</div>}
-            {error && <div>{error.message}</div>}
-        </ErrorBoundary>
-    </React.Suspense>
+    return (
+        <React.Suspense fallback={`Loading widget: ${widgetId} ${status}.`}>
+            <ErrorBoundary>
+                {component && <div>{React.createElement(component, ps)}</div>}
+                {error && <div>{error.message}</div>}
+            </ErrorBoundary>
+        </React.Suspense>
+    )
 }

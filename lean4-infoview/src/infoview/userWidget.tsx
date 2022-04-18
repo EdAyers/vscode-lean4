@@ -110,6 +110,7 @@ export function UserWidget(props: any) {
     return (
         <React.Suspense fallback={`Loading widget: ${widgetId} ${status}.`}>
             <ErrorBoundary>
+                {(widgetId && !component) && <div>Error: No StaticJS found for {widgetId}.</div>}
                 {component && <div>{React.createElement(component, ps)}</div>}
                 {error && <div>{error.message}</div>}
             </ErrorBoundary>

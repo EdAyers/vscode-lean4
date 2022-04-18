@@ -162,13 +162,32 @@ export interface GetWidgetResponse {
     props: any
 }
 
-export function Widget_getWidget(rs: RpcSessions, pos: DocumentPosition): Promise<GetWidgetResponse | undefined> {
-    return rs.call(pos, "Lean.Widget.getWidget", DocumentPosition.toTdpp(pos))
+function handleWidgetError(e : unknown) {
+    if (isRpcError(e)) {
+        if (e.code === RpcErrorCode.MethodNotFound || e.code === RpcErrorCode.InvalidParams) {
+            return undefined
+        } else {
+            throw Error(`RPC Error: ${RpcErrorCode[e.code]}: ${e.message}`)
+        }
+    } else if (Object.getOwnPropertyNames(e).length == 0) {
+        throw Error(`Blank error!`)
+    } else {
+        throw Error(`Unknown rpc error ${JSON.stringify(e)}`)
+    }
+}
+
+export async function Widget_getWidget(rs: RpcSessions, pos: DocumentPosition): Promise<GetWidgetResponse | undefined> {
+    // [todo] deduplicate with Widget_getStaticJS
+    try {
+        return await rs.call(pos, "Lean.Widget.getWidget", DocumentPosition.toTdpp(pos))
+    } catch (e) {
+        return handleWidgetError(e)
+    }
 }
 
 export interface StaticJS {
-    javascript : string
-    hash : number
+    javascript: string
+    hash: number
 }
 
 /** Gets the static JS code for a given widget.
@@ -180,14 +199,6 @@ export async function Widget_getStaticJS(rs: RpcSessions, pos: DocumentPosition,
     try {
         return await rs.call(pos, "Lean.Widget.getStaticJS", { "pos": DocumentPosition.toTdpp(pos), widgetId })
     } catch (e) {
-        if (isRpcError(e)){
-            if (e.code === RpcErrorCode.MethodNotFound || e.code === RpcErrorCode.InvalidParams) {
-                return undefined
-            } else {
-                throw Error(`RPC Error: ${RpcErrorCode[e.code]}: ${e.message}`)
-            }
-        } else {
-            throw Error(`Unknown rpc error ${JSON.stringify(e)}`)
-        }
+        return handleWidgetError(e);
     }
 }

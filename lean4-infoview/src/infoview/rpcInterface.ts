@@ -165,12 +165,16 @@ export interface GetWidgetResponse {
 function handleWidgetError(e : unknown) {
     if (isRpcError(e)) {
         if (e.code === RpcErrorCode.MethodNotFound || e.code === RpcErrorCode.InvalidParams) {
+            // There is no widget [todo] get the semantics right don't just use undefined
+            return undefined
+        } else if (e.code == RpcErrorCode.ContentModified) {
+            // [todo] In this case, just ask for the widget again.
             return undefined
         } else {
             throw Error(`RPC Error: ${RpcErrorCode[e.code]}: ${e.message}`)
         }
-    } else if (Object.getOwnPropertyNames(e).length == 0) {
-        throw Error(`Blank error!`)
+    } else if (e instanceof Error) {
+        throw e
     } else {
         throw Error(`Unknown rpc error ${JSON.stringify(e)}`)
     }

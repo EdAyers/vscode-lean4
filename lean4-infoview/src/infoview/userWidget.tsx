@@ -3,7 +3,7 @@ import type { Location } from 'vscode-languageserver-protocol';
 
 import { EditorContext, RpcContext } from './contexts';
 import { GetWidgetResponse, Widget_getStaticJS, Widget_getWidget } from './rpcInterface';
-import { DocumentPosition, useEvent, useEventResult } from './util';
+import { DocumentPosition, useEventResult } from './util';
 import { ErrorBoundary } from './errors';
 import { RpcSessions } from './rpcSessions';
 import { isRpcError, RpcErrorCode } from '@lean4/infoview-api';
@@ -26,35 +26,35 @@ function memoize<T extends (...args : any[]) => any>(fn: T, keyFn: any = (x: any
 
 const dynamicallyLoadComponent = memoize(function (hash : number, code: string, ) {
     return React.lazy(async () => {
-        let file = new File([code], `widget_${hash}.js`, { type: "text/javascript" })
-        let url = URL.createObjectURL(file)
+        const file = new File([code], `widget_${hash}.js`, { type: 'text/javascript' })
+        const url = URL.createObjectURL(file)
         return await import(url)
     })
 })
 
-type Status = "pending" | "fulfilled" | "rejected"
+type Status = 'pending' | 'fulfilled' | 'rejected'
 
 // [todo] this badly handles case where effect is being spammed because lots of in-flight promises will be updating the state without locks.
 // There is some code in the infoview that deals with this problem somewhere.
 export function useAsync<T>(fn : () => Promise<T>, deps : React.DependencyList = []) : [Status, T | undefined, Error | undefined] {
-    const [status, setStatus] = React.useState<Status>("pending")
+    const [status, setStatus] = React.useState<Status>('pending')
     const [result, setResult] = React.useState<T | undefined>(undefined)
     const [error, setError] = React.useState<Error | undefined>(undefined)
     React.useEffect(() => {
-        setStatus("pending")
+        setStatus('pending')
         setError(undefined)
         fn().then(result => {
-            setStatus("fulfilled")
+            setStatus('fulfilled')
             setResult(result)
             setError(undefined)
-        }, (err : unknown) => {
-            setStatus("rejected")
+        }, (err : any) => {
+            setStatus('rejected')
             if (isRpcError(err)) {
                 err = new Error(`Rpc error: ${RpcErrorCode[err.code]}: ${err.message}`)
             } else if (! (err instanceof Error)) {
                 err = new Error(`Unrecognised error ${JSON.stringify(err)}`)
             }
-            setError(err)
+            setError(err as Error)
         })
     }, deps)
     return [status, result, error]

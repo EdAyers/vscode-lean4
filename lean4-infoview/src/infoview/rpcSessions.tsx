@@ -96,13 +96,14 @@ export class RpcSessions implements Disposable {
 
     private async sessionAt(uri: DocumentUri): Promise<RpcSession | undefined> {
         if (this.#connected.has(uri)) return this.#connected.get(uri)
-        else if (this.#connecting.has(uri)) return this.#connecting.get(uri)
+        else if (this.#connecting.has(uri)) return await this.#connecting.get(uri)
         else return undefined
     }
 
     private connectAt(uri: DocumentUri): void {
         if (this.#connecting.has(uri) || this.#connected.has(uri)) {
-            throw new Error(`already connecting or connected at '${uri}'`)
+            // If we are already connecting then there is nothing to do.
+            return;
         }
         let newSesh: Promise<RpcSession | undefined> = this.#ec.api.createRpcSession(uri)
             .then(sessionId => new RpcSession(sessionId, uri, this.#ec))
